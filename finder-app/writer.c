@@ -5,6 +5,7 @@
 
 int main( int argc, char *argv[] )  {
 
+    int num_char = 0;
     FILE *fptr;		// Creating file pointer to work with files
 
     // Open syslog
@@ -37,7 +38,11 @@ int main( int argc, char *argv[] )  {
     }
 
     // Write into the file
-    fprintf(fptr, "%s", argv[2]);
+    num_char = fprintf(fptr, "%s", argv[2]);
+    if (num_char > 0)
+    {
+        syslog(LOG_DEBUG, "Writing %s to %s", argv[2], argv[1]);
+    }
 
     // Close the file
     fclose(fptr);
