@@ -1,4 +1,6 @@
 #include "systemcalls.h"
+#include <stdlib.h>             // To use system()
+
 
 /**
  * @param cmd the command to execute with system()
@@ -9,6 +11,7 @@
 */
 bool do_system(const char *cmd)
 {
+    bool bRetValue = false;     // Assume error state at first.
 
 /*
  * TODO  add your code here
@@ -17,7 +20,37 @@ bool do_system(const char *cmd)
  *   or false() if it returned a failure
 */
 
-    return true;
+    // Debug only
+    printf("Debug only: The command is \"%s\"\n", cmd);
+
+    int iReturnCode = system(cmd);
+    printf("Debug only: iReturnCode is %d\n", iReturnCode);
+
+    // The return value of system() is one of the following:
+    //
+    // If command is NULL, then a nonzero value if a shell is
+    //      available, or 0 if no shell is available.                       ===> command is not NULL
+    //
+    // If a child process could not be created, or its status could
+    //      not be retrieved, the return value is -1 and errno is set to
+    //      indicate the error.                                             ===> if != -1 then child process has been created
+    //
+    // If a shell could not be executed in the child process, then
+    //      the return value is as though the child shell terminated by
+    //      calling _exit(2) with the status 127.                           ===> if != 127 then shell command has been executed
+    //
+    // If all system calls succeed, then the return value is the
+    //      termination status of the child shell used to execute command.
+    //      (The termination status of a shell is the termination status
+    //      of the last command it executes.)                               ===> On success, the shell return 0
+    //
+    //if (iReturnCode != 0 && iReturnCode != -1 && iReturnCode != 127)
+    if (iReturnCode == 0)
+    {
+        bRetValue = true;
+    }
+
+    return bRetValue;
 }
 
 /**
@@ -43,6 +76,8 @@ bool do_exec(int count, ...)
     for(i=0; i<count; i++)
     {
         command[i] = va_arg(args, char *);
+        // Debug only
+        printf("Debug only: The command%d is %s\n", i, command[i]);
     }
     command[count] = NULL;
     // this line is to avoid a compile warning before your implementation is complete
@@ -57,6 +92,16 @@ bool do_exec(int count, ...)
  *   (first argument to execv), and use the remaining arguments
  *   as second argument to the execv() command.
  *
+ *      pid_t fork(void);
+ *      int execv(const char *path, char *const argv[]);
+ *           RETURN VALUE
+ *               A successful call to execv does not have a return value because the new process image overlays the calling process image. 
+ *               However, a -1 is returned if the call to execv is unsuccessful.
+ *      pid_t wait(int *wstatus);
+ *              wait(): on success, returns the process ID of the terminated child; on failure, -1 is returned.
+ *                  int wstatus;        wait(&wstatus)
+ * 
+ * Reference: https://support.sas.com/documentation/onlinedoc/sasc/doc/lr2/execv.htm
 */
 
     va_end(args);
@@ -78,6 +123,8 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
     for(i=0; i<count; i++)
     {
         command[i] = va_arg(args, char *);
+        // Debug only
+        printf("Debug only: The command%d is %s\n", i, command[i]);
     }
     command[count] = NULL;
     // this line is to avoid a compile warning before your implementation is complete
@@ -91,6 +138,10 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
  *   redirect standard out to a file specified by outputfile.
  *   The rest of the behaviour is same as do_exec()
  *
+ *      int execv(const char *path, char *const argv[]);
+ *          RETURN VALUE
+ *               A successful call to execv does not have a return value because the new process image overlays the calling process image. 
+ *               However, a -1 is returned if the call to execv is unsuccessful.
 */
 
     va_end(args);
