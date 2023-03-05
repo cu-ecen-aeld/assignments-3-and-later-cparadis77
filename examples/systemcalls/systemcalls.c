@@ -2,7 +2,7 @@
 #include <stdlib.h>             // To use system()
 #include <unistd.h>             // To use fork()
 #include <sys/wait.h>           // To use wait()
-
+#include <fcntl.h>              // To use open()
 
 
 
@@ -26,10 +26,10 @@ bool do_system(const char *cmd)
  */
 
     // Debug only
-    printf("Debug only: do_system(): The command is \"%s\"\n", cmd);
+    printf("Debug only: do_system(): The command is: \"%s\"\n", cmd);
 
     int iReturnCode = system(cmd);
-    printf("Debug only: do_system(): iReturnCode is %d\n", iReturnCode);
+    printf("Debug only: do_system(): iReturnCode is: %d\n", iReturnCode);
 
     // The return value of system() is one of the following:
     //
@@ -79,7 +79,7 @@ bool do_system(const char *cmd)
 bool do_exec(int count, ...)
 {
     bool bRetValue = false;     // Assume error state at first.
-    printf("Debug only: do_exec(): The count is %d\n", count);
+    printf("Debug only: do_exec(): The count is: %d\n", count);
 
     va_list args;
     va_start(args, count);
@@ -89,7 +89,7 @@ bool do_exec(int count, ...)
     {
         command[i] = va_arg(args, char *);
         // Debug only
-        printf("Debug only: do_exec(): The command%d is %s\n", i, command[i]);
+        printf("Debug only: do_exec(): The command%d is: \"%s\"\n", i, command[i]);
     }
     command[count] = NULL;
     // this line is to avoid a compile warning before your implementation is complete
@@ -134,6 +134,7 @@ bool do_exec(int count, ...)
     int execvRetCode;
     pid_t waitedChildPid;
     int waitStatus;
+    fflush(stdout);                     // To avoid duplicated output in stdout
     if ((childPid = fork()) == -1 )
     {
         perror("can't fork");
@@ -171,6 +172,10 @@ bool do_exec(int count, ...)
     return bRetValue;
 }
 
+
+
+
+
 /**
 * @param outputfile - The full path to the file to write with command output.
 *   This file will be closed at completion of the function call.
@@ -179,8 +184,8 @@ bool do_exec(int count, ...)
 bool do_exec_redirect(const char *outputfile, int count, ...)
 {
     bool bRetValue = false;     // Assume error state at first.
-    printf("Debug only: do_exec_redirect(): The outputfile is %s\n", outputfile);
-    printf("Debug only: do_exec_redirect(): The count is %d\n", count);
+    printf("Debug only: do_exec_redirect(): The outputfile is: \"%s\"\n", outputfile);
+    printf("Debug only: do_exec_redirect(): The count is: %d\n", count);
 
     va_list args;
     va_start(args, count);
@@ -190,13 +195,14 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
     {
         command[i] = va_arg(args, char *);
         // Debug only
-        printf("Debug only: do_exec_redirect(): The command%d is %s\n", i, command[i]);
+        printf("Debug only: do_exec_redirect(): The command%d is: \"%s\"\n", i, command[i]);
     }
     command[count] = NULL;
     // this line is to avoid a compile warning before your implementation is complete
     // and may be removed
-    command[count] = command[count];
+    //command[count] = command[count];
 
+    va_end(args);
 
 /*
  * TODO
@@ -208,10 +214,62 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
  *          RETURN VALUE
  *               A successful call to execv does not have a return value because the new process image overlays the calling process image. 
  *               However, a -1 is returned if the call to execv is unsuccessful.
-*/
+ */
 
-    va_end(args);
+    pid_t childPid;
+    int execvRetCode;
+    pid_t waitedChildPid;
+    int waitStatus;
 
-    bRetValue = true;   // TEMPORARY only!!!!
+    int fd = open(outputfile, O_WRONLY|O_TRUNC|O_CREAT, 0644);
+    if (fd < 0)
+    { 
+        perror("error on open()");
+    }
+
+    fflush(stdout);                     // To avoid duplicated output in stdout
+
+    if ((childPid = fork()) == -1 )
+    {
+        perror("can't fork");
+    }
+    else if (childPid == 0)
+    {
+        // Let Child Process to execute any work
+        if (dup2(fd, 1) < 0)
+        { 
+            perror("error on dup2()");
+        }
+        close(fd);
+
+        execvRetCode = execv(command[0], command);
+        printf("Debug only: do_exec_redirect(): The return code is %d, but return is not expected on success\n", execvRetCode);
+    }
+    else
+    {
+        // Let Parent process to finish any work
+        close(fd);
+
+        printf("Debug only: do_exec_redirect(): The Child PID is %d\n", childPid);
+        
+        // Waiting on Child process
+        waitedChildPid = wait(&waitStatus);
+        
+        if (waitedChildPid == -1)
+        {
+            perror("Got error while waiting on Child process...");
+        }
+        else
+        {
+            printf("Debug only: do_exec_redirect(): The Waited Child PID is %d\n", waitedChildPid);
+            printf("Debug only: do_exec_redirect(): The Wait status is %d\n", waitStatus);
+
+            if ((childPid == waitedChildPid) && (waitStatus == 0))
+            {
+                bRetValue = true;
+            }
+        }
+    }
+
     return bRetValue;
 }
