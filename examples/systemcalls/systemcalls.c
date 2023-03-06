@@ -130,20 +130,23 @@ bool do_exec(int count, ...)
  * 
  */
 
-    pid_t childPid;
-    int execvRetCode;
-    pid_t waitedChildPid;
-    int waitStatus;
+    pid_t childPid = -2;
+    int execvRetCode = -2;
+    pid_t waitedChildPid = -2;
+    int waitStatus = -1;
     fflush(stdout);                     // To avoid duplicated output in stdout
     if ((childPid = fork()) == -1 )
     {
         perror("can't fork");
     }
-    else if (childPid == 0)
+
+    if (childPid == 0)
     {
         // Let Child Process to execute any work
         execvRetCode = execv(command[0], command);
-        printf("Debug only: do_exec(): The return code is %d, but return is not expected on success\n", execvRetCode);
+        
+        printf("Debug only: do_exec(): From Child process...The execv() return code is %d, exiting with failure!!\n", execvRetCode);
+        exit(EXIT_FAILURE);
     }
     else
     {
@@ -152,16 +155,16 @@ bool do_exec(int count, ...)
         
         // Waiting on Child process
         waitedChildPid = wait(&waitStatus);
-        
+                
+        printf("Debug only: do_exec(): The Waited Child PID is %d\n", waitedChildPid);
+        printf("Debug only: do_exec(): The Wait status is %d\n", waitStatus);
+
         if (waitedChildPid == -1)
         {
             perror("Got error while waiting on Child process...");
         }
         else
         {
-            printf("Debug only: do_exec(): The Waited Child PID is %d\n", waitedChildPid);
-            printf("Debug only: do_exec(): The Wait status is %d\n", waitStatus);
-
             if ((childPid == waitedChildPid) && (waitStatus == 0))
             {
                 bRetValue = true;
@@ -216,10 +219,10 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
  *               However, a -1 is returned if the call to execv is unsuccessful.
  */
 
-    pid_t childPid;
-    int execvRetCode;
-    pid_t waitedChildPid;
-    int waitStatus;
+    pid_t childPid = -2;
+    int execvRetCode = -2;
+    pid_t waitedChildPid = -2;
+    int waitStatus = -1;
 
     int fd = open(outputfile, O_WRONLY|O_TRUNC|O_CREAT, 0644);
     if (fd < 0)
@@ -233,7 +236,8 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
     {
         perror("can't fork");
     }
-    else if (childPid == 0)
+
+    if (childPid == 0)
     {
         // Let Child Process to execute any work
         if (dup2(fd, 1) < 0)
@@ -243,7 +247,9 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
         close(fd);
 
         execvRetCode = execv(command[0], command);
-        printf("Debug only: do_exec_redirect(): The return code is %d, but return is not expected on success\n", execvRetCode);
+        
+        printf("Debug only: do_exec_redirect(): From Child process...The execv() return code is %d, exiting with failure!!\n", execvRetCode);
+        exit(EXIT_FAILURE);
     }
     else
     {
@@ -255,15 +261,15 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
         // Waiting on Child process
         waitedChildPid = wait(&waitStatus);
         
+        printf("Debug only: do_exec_redirect(): The Waited Child PID is %d\n", waitedChildPid);
+        printf("Debug only: do_exec_redirect(): The Wait status is %d\n", waitStatus);
+
         if (waitedChildPid == -1)
         {
             perror("Got error while waiting on Child process...");
         }
         else
         {
-            printf("Debug only: do_exec_redirect(): The Waited Child PID is %d\n", waitedChildPid);
-            printf("Debug only: do_exec_redirect(): The Wait status is %d\n", waitStatus);
-
             if ((childPid == waitedChildPid) && (waitStatus == 0))
             {
                 bRetValue = true;
