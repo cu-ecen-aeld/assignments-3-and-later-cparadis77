@@ -1,7 +1,14 @@
 # !/bin/bash
 # Script to open qemu terminal.
 # Author: Siddhant Jajoo.
-
+#
+#
+#
+# Modification from CParadis:
+#
+#   Usage: start-qemu-terminal.sh [outdir]
+#     outdir    is the absolute path of the location on the filesystem where the output files should be placed
+#
 set -e
 
 OUTDIR=$1

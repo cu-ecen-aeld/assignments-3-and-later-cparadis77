@@ -1,9 +1,9 @@
 #
-# usage:	make all						to build for x86-64
-#		make clean
+# usage:	make all											to build for x86-64
+#			make clean
 #
-#		make CROSS_COMPILE=aarch64-none-linux-gnu- all		to build for ARM 64 bits
-#		make CROSS_COMPILE=aarch64-none-linux-gnu- clean
+#			make CROSS_COMPILE=aarch64-none-linux-gnu- all		to build for ARM 64 bits
+#			make CROSS_COMPILE=aarch64-none-linux-gnu- clean
 #
 
 

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 #
 # Small script that is looking for files in specified folders (and recursively in sub folders)
 #
@@ -42,11 +42,14 @@ num_lines=$(echo "$files_found" | wc -l)
 # Find all match
 #matches_found=$(find $filesdir -type f | grep $searchstr)      # BAD
 #matches_found=$(echo $files_found | grep $searchstr)           # BAD
-pushd $filesdir &>/dev/null
+#pushd $filesdir &>/dev/null                                    # BAD can not use it with 'sh' interpreter, but I can with 'bash' intrepreter
+                                                                #     For assignment 3 in qemu, I need to use a 'sh' interpreter
+cd $filesdir
 matches_found=$(grep $searchstr *)
 num_matches=$(echo "$matches_found" | wc -l)
-popd &>/dev/null
 
+#popd &>/dev/null                                               # BAD can not use it with 'sh' interpreter, but I can with 'bash' intrepreter
+                                                                #     For assignment 3 in qemu, I need to use a 'sh' interpreter
 #Debug only
 #echo "Debug: matches_found=$matches_found"
 #echo "Debug: num_matches=$num_matches"
