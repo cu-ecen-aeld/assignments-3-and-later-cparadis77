@@ -33,7 +33,8 @@ rm -rf "${WRITEDIR}"
 
 # create $WRITEDIR if not assignment1
 #assignment=`cat ../conf/assignment.txt`
-assignment='assignment3'					# Modified to be used with Assignment 3 Part2
+#assignment='assignment3'					# Modified to be used with Assignment 3 Part2
+assignment='assignment4'					# Modified to be used with Assignment 4 Part2
 
 if [ $assignment != 'assignment1' ]
 then
@@ -62,6 +63,9 @@ do
 done
 
 OUTPUTSTRING=$(./finder.sh "$WRITEDIR" "$WRITESTR")
+
+# Create a file '/tmp/assignment4-result.txt' with Output String result
+echo ${OUTPUTSTRING} > /tmp/assignment4-result.txt
 
 # remove temporary directories
 rm -rf /tmp/aeld-data
