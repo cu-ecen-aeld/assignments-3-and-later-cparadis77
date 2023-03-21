@@ -60,12 +60,15 @@ fi
 for i in $( seq 1 $NUMFILES)
 do
 	#./writer.sh "$WRITEDIR/${username}$i.txt" "$WRITESTR"
-	./writer "$WRITEDIR/${username}$i.txt" "$WRITESTR"
+	#./writer "$WRITEDIR/${username}$i.txt" "$WRITESTR"					# Modified to be used with Assignment 2
+	writer "$WRITEDIR/${username}$i.txt" "$WRITESTR"					# Modified to be used with Assignment 4 Part2
 done
 
-OUTPUTSTRING=$(./finder.sh "$WRITEDIR" "$WRITESTR")
 
-# Create a file '/tmp/assignment4-result.txt' with Output String result
+#OUTPUTSTRING=$(./finder.sh "$WRITEDIR" "$WRITESTR")
+OUTPUTSTRING=$(finder.sh "$WRITEDIR" "$WRITESTR")						# Modified to be used with Assignment 4 Part2
+
+# Create a file '/tmp/assignment4-result.txt' with OUTPUTSTRING result	# Modified to be used with Assignment 4 Part2
 echo ${OUTPUTSTRING} > /tmp/assignment4-result.txt
 
 # remove temporary directories
