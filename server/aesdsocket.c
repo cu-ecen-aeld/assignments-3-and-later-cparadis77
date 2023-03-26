@@ -3,7 +3,7 @@
 //  Small server app that handle 1 client connection, get data, store it, and send it back.
 //
 //
-//  Usage:  ./aesdsocket            To run it without a daemon
+//  Usage:  ./aesdsocket            To run it as a normal application
 //          ./aesdsocket -d         To run it as a deamon
 //
 //
@@ -20,7 +20,7 @@
 //      Note: Need to handle data from socket.................................DONE
 //      Note: Need to write data into a file..................................DONE
 //      Note: Need to send the full file content back to the client...........DONE  (only when the received packet is completed)
-//      TODO: need to handle argument -d and launch it as a daemon............TBD
+//      Note: Need to handle argument -d and launch it as a daemon............DONE
 //
 //
 //  Note: In short, ssize_t is the same as size_t, but is a signed type - read ssize_t as
@@ -171,7 +171,8 @@ int main(int argc, char *argv[])
 
     bool bRunAsDaemon = false;                  // Flag to run app as a daemon
 
-
+    pid_t childPid = -2;                        // To add support to run it as a daemon
+    
     DEBUG_LOG("main()...entry point...argc=%d", argc);
 
     // Open syslog
@@ -193,8 +194,7 @@ int main(int argc, char *argv[])
         if ((argc == 2) && (strcmp( argv[1], "-d") == 0))
             bRunAsDaemon = true;
     }
-    printf("main()...bRunAsDaemon=%d\n", bRunAsDaemon);             // TEMPORARY for compilation issue
-
+    
     
     // Set sigaction to hanlde Signals
     DEBUG_LOG("main()...set signal handler...");
@@ -258,6 +258,36 @@ int main(int argc, char *argv[])
     int flags = fcntl(server_socket, F_GETFL, 0);
     assert(flags != -1);
     fcntl(server_socket, F_SETFL, flags | O_NONBLOCK);
+
+
+    if (bRunAsDaemon)
+    {
+        // Run app as a daemon!!
+        fflush(stdout);                     // To avoid duplicated output in stdout
+
+        if ((childPid = fork()) == -1)
+        {
+            syslog(LOG_ERR, "Failed to fork, errno %d (%s)", errno, strerror(errno));
+        }
+        else if (childPid > 0)
+        {
+            // This is the parent process; exit
+            printf("main(): From parent process, the Child PID is %d\n", childPid);
+            printf("main(): From parent process, exiting!!\n");
+            exit(EXIT_SUCCESS);
+        }
+        else if (childPid == 0)
+        {
+            // This is the child process; Run the main loop
+            printf("main(): From child process, the Child PID is %d\n", childPid);
+            printf("main(): From child process, running main loop!!\n");
+        }
+        else
+        {
+            syslog(LOG_ERR, "Failed to fork, childPid is %d", childPid);
+        }
+    }
+    
     
 
     int loop_number = 1;
@@ -388,10 +418,17 @@ int main(int argc, char *argv[])
                         DEBUG_LOG("main()...====> Main loop...Send buffer content back to the client...");
                         num_bytes_sent = send(client_socket, my_tmp_buffer, strlen(my_tmp_buffer), 0);
                         DEBUG_LOG("main()...====> Main loop...num_bytes_sent: %ld", num_bytes_sent);
-                        printf("main()...====> Main loop...num_bytes_sent: %ld", num_bytes_sent);       // TEMPORARY for compilation issue
+                        
+                        if ((size_t)num_bytes_sent != strlen(my_tmp_buffer))
+                        {
+                            syslog(LOG_ERR, "Failed to send all buffer to client, errno %d (%s)", errno, strerror(errno));
+                        }
+                        else
+                        {
+                            DEBUG_LOG("main()...====> Main loop...All good all buffer sent to client...");
+                        }
 
-
-                        // Free buffer and close file
+                        // Free buffer
                         free(my_tmp_buffer);
                     }
                 }

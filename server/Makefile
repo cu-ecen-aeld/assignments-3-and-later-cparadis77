@@ -24,6 +24,6 @@ server: aesdsocket.c
 .PHONY: clean
 
 clean:
-	rm -f $(TARGET)
+	rm -f $(TARGET) *.txt
 
 .DEFAULT_GOAL := all
