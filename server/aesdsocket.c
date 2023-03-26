@@ -53,17 +53,17 @@
 #define RECV_BUFFER_SIZE 1024
 
 // Optional: use these functions to add debug or error prints to your application
-//#define DEBUG_LOG(msg,...)
-#define DEBUG_LOG(msg,...) printf("LOG_DEBUG: " msg "\n" , ##__VA_ARGS__)
+#define DEBUG_LOG(msg,...)
+//#define DEBUG_LOG(msg,...) printf("LOG_DEBUG: " msg "\n" , ##__VA_ARGS__)
 #define ERROR_LOG(msg,...) printf("LOG_ERROR: " msg "\n" , ##__VA_ARGS__)
 
 
 // -- Flags ---------------------------------------------------------------------------------------
-volatile int running = 1;                       // TODO: change flag for bool instead of int
+volatile int running = 1;               // TODO: change flag for bool instead of int
 
 bool caught_sigint = false;
 bool caught_sigterm = false;
-//bool caught_sigkill = false;                  // Note that SIGKILL signal can not be caught and handle!!
+//bool caught_sigkill = false;          // Note that SIGKILL signal can not be caught and handle!!
 int  caught_another_sig = -1;
 
 
@@ -147,51 +147,30 @@ void print_signal_infos()
 }
 
 
-//////////////////////////////////////////
-// Function to delete the output file
-//////////////////////////////////////////
-// void delete_output_file()
-// {
-//     DEBUG_LOG("delete_output_file()...");
-
-//     int result = remove(OUTPUT_FILE);
-
-//     if (result == 0)
-//     {
-//         DEBUG_LOG("delete_output_file()...File deleted successfully.");
-//     }
-//     else
-//     {
-//         ERROR_LOG("delete_output_file()...Failed to delete file %s, errno %d (%s)", OUTPUT_FILE, errno, strerror(errno));
-//         syslog(LOG_ERR, "Failed to delete file %s, errno %d (%s)", OUTPUT_FILE, errno, strerror(errno));
-//     }
-// }
-
 
 //////////////////////////////////////////
 // Main Server entry point
 //////////////////////////////////////////
 int main(int argc, char *argv[])
 {
-    FILE *pFile;		                    // Creating file pointer to work with files
-    int socket_fd;                          // Socket file descriptor used by the Server                                        //server_fd;
-    int new_socket = -1;                    // Socket file descriptor used to communicate with a client application         // *** to be rename client_socket ***
-    struct sockaddr_in sSockAddress;        // Socket addr structure
+    FILE *pFile;		                        // File descriptor to work with files
+    int server_socket;                          // Socket file descriptor used by the Server
+    int client_socket = -1;                     // Socket file descriptor used to communicate with a client application
+    struct sockaddr_in sSockAddress;            // Socket addr structure
     int opt = 1;
     int addrlen = sizeof(sSockAddress);
-    //char buffer[1024] = {0};              // To be remove
-    char recv_buffer[RECV_BUFFER_SIZE] = {0};
-    bool bRunAsDaemon = false;
+
+    char client_ip[INET_ADDRSTRLEN];            // Used to extract client IP addr
+    int client_port = -1;                       // Used to extract the client port
+
+    char recv_buffer[RECV_BUFFER_SIZE] = {0};   // Received buffer to get data from socket
     ssize_t num_bytes_received;
     
-    char client_ip[INET_ADDRSTRLEN];        // Used to extract client IP addr
-    int client_port = -1;                   // Used to extract the client port
+    bool bSendDataBackToClient = false;         // Flag indicating to send data back to client 
+    ssize_t num_bytes_sent;                     
 
-    bool bSendDataBackToClient = false;
-    ssize_t num_bytes_sent;
+    bool bRunAsDaemon = false;                  // Flag to run app as a daemon
 
-    int iUsleepRc = 0;                      // TODO: to be remove!!
-    
 
     DEBUG_LOG("main()...entry point...argc=%d", argc);
 
@@ -214,7 +193,7 @@ int main(int argc, char *argv[])
         if ((argc == 2) && (strcmp( argv[1], "-d") == 0))
             bRunAsDaemon = true;
     }
-    DEBUG_LOG("main()...bRunAsDaemon=%d", bRunAsDaemon);
+    printf("main()...bRunAsDaemon=%d\n", bRunAsDaemon);             // TEMPORARY for compilation issue
 
     
     // Set sigaction to hanlde Signals
@@ -241,14 +220,14 @@ int main(int argc, char *argv[])
 
     // Creating socket file descriptor
     DEBUG_LOG("main()...create and set server socket...");
-    if ((socket_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0)
+    if ((server_socket = socket(AF_INET, SOCK_STREAM, 0)) == 0)
     {
         syslog(LOG_ERR, "Failed to create server socket, errno %d (%s)", errno, strerror(errno));
         exit(EXIT_FAILURE);
     }
 
     // Set some socket option
-    if (setsockopt(socket_fd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt)))
+    if (setsockopt(server_socket, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt)))
     {
         syslog(LOG_ERR, "Failed to set socket options, errno %d (%s)", errno, strerror(errno));
         exit(EXIT_FAILURE);
@@ -261,13 +240,13 @@ int main(int argc, char *argv[])
     sSockAddress.sin_addr.s_addr = INADDR_ANY;
     sSockAddress.sin_port = htons(PORT);
 
-    if (bind(socket_fd, (struct sockaddr *) &sSockAddress, sizeof(sSockAddress)) < 0)
+    if (bind(server_socket, (struct sockaddr *) &sSockAddress, sizeof(sSockAddress)) < 0)
     {
         syslog(LOG_ERR, "Failed to bind socket on port %d, errno %d (%s)", PORT, errno, strerror(errno));
         exit(EXIT_FAILURE);
     }
 
-    if (listen(socket_fd, CONNECTION_QUEUE) < 0)
+    if (listen(server_socket, CONNECTION_QUEUE) < 0)
     {
         syslog(LOG_ERR, "Failed to listen on socket, errno %d (%s)", errno, strerror(errno));
         exit(EXIT_FAILURE);
@@ -276,25 +255,25 @@ int main(int argc, char *argv[])
     
     // Set the server socket to non-blocking mode
     DEBUG_LOG("main()...set socket non-blocking...");
-    int flags = fcntl(socket_fd, F_GETFL, 0);
+    int flags = fcntl(server_socket, F_GETFL, 0);
     assert(flags != -1);
-    fcntl(socket_fd, F_SETFL, flags | O_NONBLOCK);
+    fcntl(server_socket, F_SETFL, flags | O_NONBLOCK);
     
 
     int loop_number = 1;
     while (running)
     {
         // Do not log...there is too much!!
-        //syslog(LOG_DEBUG, "====> Main loop number= %d, new_socket= %d", loop_number, new_socket);
+        //syslog(LOG_DEBUG, "====> Main loop number= %d, client_socket= %d", loop_number, client_socket);
         
-        if (new_socket == -1)
+        if (client_socket == -1)
         {
             // Look for new client connection
-            new_socket = accept(socket_fd, (struct sockaddr *) &sSockAddress, (socklen_t *) &addrlen);
+            client_socket = accept(server_socket, (struct sockaddr *) &sSockAddress, (socklen_t *) &addrlen);
             // Do not log...there is too much!!
-            //syslog(LOG_DEBUG, "Main loop...Debug only...new_socket= %d", new_socket);
+            //syslog(LOG_DEBUG, "Main loop...Debug only...client_socket= %d", client_socket);
             
-            if (new_socket == -1)
+            if (client_socket == -1)
             {
                 // Do not log...there is too much!!
                 //syslog(LOG_ERR, "Failed on accept(), errno %d (%s)", errno, strerror(errno));
@@ -310,9 +289,9 @@ int main(int argc, char *argv[])
             }
         }
 
-        if (new_socket >= 0)
+        if (client_socket >= 0)
         {
-            DEBUG_LOG("main()...====> Main loop...a client is connected, new_socket = %d", new_socket);
+            DEBUG_LOG("main()...====> Main loop...a client is connected, client_socket = %d", client_socket);
 
             // Get data from Socket
             //
@@ -321,7 +300,7 @@ int main(int argc, char *argv[])
             DEBUG_LOG("main()...====> Main loop...Look for received data on client socket...");
 
             memset(recv_buffer, 0, sizeof(recv_buffer));    // clear buffer
-            num_bytes_received = recv(new_socket, recv_buffer, RECV_BUFFER_SIZE, 0);
+            num_bytes_received = recv(client_socket, recv_buffer, RECV_BUFFER_SIZE, 0);
             DEBUG_LOG("main()...====> Main loop...Num byte received is: %ld", num_bytes_received);
 
             if (num_bytes_received > 0)
@@ -391,8 +370,6 @@ int main(int argc, char *argv[])
                     if (my_tmp_buffer == NULL)
                     {
                         syslog(LOG_ERR, "Failed on malloc(), errno %d (%s)", errno, strerror(errno));
-                        // Handle error allocating buffer
-                        //fclose(pFile);                    // TODO: TO be remove!!!
                     }
                     else
                     {
@@ -409,13 +386,13 @@ int main(int argc, char *argv[])
                         
 
                         DEBUG_LOG("main()...====> Main loop...Send buffer content back to the client...");
-                        num_bytes_sent = send(new_socket, my_tmp_buffer, strlen(my_tmp_buffer), 0);
+                        num_bytes_sent = send(client_socket, my_tmp_buffer, strlen(my_tmp_buffer), 0);
                         DEBUG_LOG("main()...====> Main loop...num_bytes_sent: %ld", num_bytes_sent);
+                        printf("main()...====> Main loop...num_bytes_sent: %ld", num_bytes_sent);       // TEMPORARY for compilation issue
 
 
                         // Free buffer and close file
                         free(my_tmp_buffer);
-                        //fclose(file);                         // TODO: TO be remove!!!
                     }
                 }
                 else
@@ -432,10 +409,10 @@ int main(int argc, char *argv[])
                 {
                     syslog(LOG_DEBUG, "Closed connection from %s:%d", client_ip, client_port);
 
-                    if (close(new_socket) != 0)
+                    if (close(client_socket) != 0)
                         syslog(LOG_ERR, "Failed closing client socket, errno %d (%s)", errno, strerror(errno));
 
-                    new_socket = -1;                // Re-init client_socket file descriptor
+                    client_socket = -1;                // Re-init client_socket file descriptor
                 }
                 else if (num_bytes_received == -1)   // Handle error
                 {
@@ -448,13 +425,13 @@ int main(int argc, char *argv[])
             }
         }
         
-        loop_number += 1;               // Update loop_number
-        //iUsleepRc = usleep(100000);     // Sleep 100ms... to be remove!!!
-        iUsleepRc = usleep(10000);     // Sleep 10ms... to be remove!!!
-        if (iUsleepRc != 0)
-        {
-            syslog(LOG_ERR, "Failed on usleep(), errno %d (%s)", errno, strerror(errno));
-        }
+        loop_number += 1;                   // Update loop_number
+        
+        // if (usleep(10000) != 0)             // Sleep 10ms... to be remove!!!    // Used for debug only, commented out
+        // {
+        //     syslog(LOG_ERR, "Failed on usleep(), errno %d (%s)", errno, strerror(errno));
+        // }
+
     }   // End while (running)
 
 
@@ -464,13 +441,13 @@ int main(int argc, char *argv[])
     //      closing output file
     //      deleting output file
     DEBUG_LOG("main()...Cleanup before exit...");
-    if (new_socket != -1)
+    if (client_socket != -1)
     {
-        if (close(new_socket) != 0)
+        if (close(client_socket) != 0)
             syslog(LOG_ERR, "Failed closing client socket, errno %d (%s)", errno, strerror(errno));
     }
             
-    if (close(socket_fd) != 0)
+    if (close(server_socket) != 0)
         syslog(LOG_ERR, "Failed closing server socket, errno %d (%s)", errno, strerror(errno));
     
     if (fclose(pFile) != 0)
