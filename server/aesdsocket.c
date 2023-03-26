@@ -1,18 +1,27 @@
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 //
+//  Small server app that handle 1 client connection, get data, store it, and send it back.
+//
+//
+//  Usage:  ./aesdsocket            To run it without a daemon
+//          ./aesdsocket -d         To run it as a deamon
+//
+//
 // Application description:
 //      Small server using TCP socket type, that listen on port 9000.
-//      The server shall get all the data from client and store it into a file
-//      "/var/tmp/aesdsocketdata" and when done, it will send back all the received data to the
-//      client.
+//          - The server shall get all the data from client and store it into a file
+//              "/var/tmp/aesdsocketdata".
+//          - When it received a packet complete, then it shall send back to the client the full
+//              file content (but only when the packet is completed)
+//          - Note that the packet are ended when a newline character is found
 //
-//      Note: The application handle SIGINT and SIGTERM using a sigaction
-//      
-//      TODO: need to support client and use non-blocking socket..............DONE  (we do not need to support multiple client at the same time)
-//      TODO: need to handle data from socket.................................DONE
-//      TODO: need to write data into a file..................................DONE
-//      TODO: need to send the full file content back to the client...........DONE (only when the received packet is completed)
+//      Note: The application handle SIGINT and SIGTERM using a sigaction.....DONE
+//      Note: Need to support client and use non-blocking socket..............DONE  (we do not need to support multiple clients at the same time)
+//      Note: Need to handle data from socket.................................DONE
+//      Note: Need to write data into a file..................................DONE
+//      Note: Need to send the full file content back to the client...........DONE  (only when the received packet is completed)
 //      TODO: need to handle argument -d and launch it as a daemon............TBD
+//
 //
 //  Note: In short, ssize_t is the same as size_t, but is a signed type - read ssize_t as
 //          “signed size_t”. ssize_t is able to represent the number -1, which is returned by
@@ -20,10 +29,7 @@
 //          read and write system calls
 //
 //              size_t  == long unsigned int
-//              ssize_t == long signed int 
-//
-//  Usage:  ./aesdsocket            To run it without a daemon
-//          ./aesdsocket -d         To run it as a deamon
+//              ssize_t == long signed int
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -111,6 +117,7 @@ void handle_signal(int signal_number)
 
     // Set global flag
     running = 0;
+    syslog(LOG_ERR, "Caught signal, exiting");
 }
 
 //////////////////////////////////////////
@@ -121,37 +128,44 @@ void print_signal_infos()
     DEBUG_LOG("print_signal_infos()...");
 
     if (caught_sigint)
+    {
         DEBUG_LOG("print_signal_infos()...Caught SIGINT!");
-
+        syslog(LOG_ERR, "Caught SIGINT!");
+    }
+        
     if (caught_sigterm)
+    {
         DEBUG_LOG("print_signal_infos()...Caught SIGTERM!");
-
+        syslog(LOG_ERR, "Caught SIGTERM!");
+    }
+        
     if (caught_another_sig != -1)
-        DEBUG_LOG("print_signal_infos()...Caught Signal no %d", caught_another_sig);
-
-    syslog(LOG_ERR, "Caught signal, exiting");
+    {
+        DEBUG_LOG("print_signal_infos()...Caught another Signal no %d", caught_another_sig);
+        syslog(LOG_ERR, "Caught Caught another Signal no %d", caught_another_sig);
+    }
 }
 
 
 //////////////////////////////////////////
 // Function to delete the output file
 //////////////////////////////////////////
-void delete_output_file()
-{
-    DEBUG_LOG("delete_output_file()...");
+// void delete_output_file()
+// {
+//     DEBUG_LOG("delete_output_file()...");
 
-    int result = remove(OUTPUT_FILE);
+//     int result = remove(OUTPUT_FILE);
 
-    if (result == 0)
-    {
-        DEBUG_LOG("delete_output_file()...File deleted successfully.");
-    }
-    else
-    {
-        ERROR_LOG("delete_output_file()...Failed to delete file %s, errno %d (%s)", OUTPUT_FILE, errno, strerror(errno));
-        syslog(LOG_ERR, "Failed to delete file %s, errno %d (%s)", OUTPUT_FILE, errno, strerror(errno));
-    }
-}
+//     if (result == 0)
+//     {
+//         DEBUG_LOG("delete_output_file()...File deleted successfully.");
+//     }
+//     else
+//     {
+//         ERROR_LOG("delete_output_file()...Failed to delete file %s, errno %d (%s)", OUTPUT_FILE, errno, strerror(errno));
+//         syslog(LOG_ERR, "Failed to delete file %s, errno %d (%s)", OUTPUT_FILE, errno, strerror(errno));
+//     }
+// }
 
 
 //////////////////////////////////////////
@@ -187,11 +201,11 @@ int main(int argc, char *argv[])
     // Handle parameters
     if (argc > 2)
     {
+        printf("Error! Invalid number of arguments: %d\n", argc);
+        printf("\n");
         printf("Usage: %s          to run it as an application\n", argv[0]);
         printf("Usage: %s -d       to run it as a daemon\n", argv[0]);
         
-        // log system LOG_ERR
-        syslog(LOG_ERR, "Error! Invalid number of arguments: %d", argc);
         exit(EXIT_FAILURE);
     }
     else 
@@ -270,88 +284,74 @@ int main(int argc, char *argv[])
     int loop_number = 1;
     while (running)
     {
-        //printf("Main loop number= %d, new_socket= %d\n", loop_number, new_socket);
-        syslog(LOG_DEBUG, "====> Main loop number= %d, new_socket= %d", loop_number, new_socket);
-        //DEBUG_LOG("main()...====> Main loop number= %d, new_socket= %d", loop_number, new_socket);
-
+        // Do not log...there is too much!!
+        //syslog(LOG_DEBUG, "====> Main loop number= %d, new_socket= %d", loop_number, new_socket);
+        
         if (new_socket == -1)
         {
             // Look for new client connection
             new_socket = accept(socket_fd, (struct sockaddr *) &sSockAddress, (socklen_t *) &addrlen);
-            //printf("Main loop...Debug only...new_socket= %d\n", new_socket);
-            syslog(LOG_DEBUG, "Main loop...Debug only...new_socket= %d", new_socket);
-            //DEBUG_LOG("main()...====> Main loop...new_socket= %d", new_socket);
-
+            // Do not log...there is too much!!
+            //syslog(LOG_DEBUG, "Main loop...Debug only...new_socket= %d", new_socket);
+            
             if (new_socket == -1)
-                syslog(LOG_ERR, "Failed on accept(), errno %d (%s)", errno, strerror(errno));
+            {
+                // Do not log...there is too much!!
+                //syslog(LOG_ERR, "Failed on accept(), errno %d (%s)", errno, strerror(errno));
+            }
             else
             {
                 // Extract client IP address and port
-                //client_ip[INET_ADDRSTRLEN] = {0};       // Re-init buffer
                 memset(client_ip, 0, sizeof(client_ip)); // clear buffer
                 inet_ntop(AF_INET, &(sSockAddress.sin_addr), client_ip, INET_ADDRSTRLEN);
                 client_port = ntohs(sSockAddress.sin_port);
 
-                syslog(LOG_DEBUG, "+++++++++++++++++++++++++++ New connection from %s:%d", client_ip, client_port);
+                syslog(LOG_DEBUG, "New connection from %s:%d", client_ip, client_port);
             }
         }
 
         if (new_socket >= 0)
         {
-            //printf("Main loop...Debug only...a client is connected, new_socket = %d\n", new_socket);
+            DEBUG_LOG("main()...====> Main loop...a client is connected, new_socket = %d", new_socket);
 
             // Get data from Socket
             //
             //      ssize_t recv(int sockfd, void *buf, size_t len, int flags);
-            //
-            //int valread = -1;
-            //buffer[1024] = {0};         // re-init buffer, clear buffer
-            //valread = read(new_socket, buffer, 1024);
-            //valread = recv(new_socket, buffer , 1024 , 0);
-            //num_bytes_received = recv(new_socket, buffer , 1024 , 0);
+            //            
+            DEBUG_LOG("main()...====> Main loop...Look for received data on client socket...");
 
-            syslog(LOG_DEBUG, "Look for received data on client socket...");
-
-            memset(recv_buffer, 0, sizeof(recv_buffer)); // clear buffer
-            //num_bytes_received = recv(new_socket, recv_buffer, sizeof(recv_buffer), 0);
+            memset(recv_buffer, 0, sizeof(recv_buffer));    // clear buffer
             num_bytes_received = recv(new_socket, recv_buffer, RECV_BUFFER_SIZE, 0);
-            
-            //printf("Num byte received is: %ld\n", num_bytes_received);
-            syslog(LOG_DEBUG, "Num byte received is: %ld", num_bytes_received);
+            DEBUG_LOG("main()...====> Main loop...Num byte received is: %ld", num_bytes_received);
 
             if (num_bytes_received > 0)
-            {
-                //printf("Buffer contains     : %s\n", buffer);
-                syslog(LOG_DEBUG, "Received buffer contains: %s", recv_buffer);
-                syslog(LOG_DEBUG, "Received buffer strlen(): %ld", strlen(recv_buffer));
+            {                
+                if (num_bytes_received < 256)   // Arbitrary value, just do not output large buffer
+                {
+                    DEBUG_LOG("main()...====> Main loop...Received buffer contains: %s", recv_buffer);
+                }                
+                DEBUG_LOG("main()...====> Main loop...Received buffer strlen(): %ld", strlen(recv_buffer));
                 size_t num_bytes_to_write = (size_t)num_bytes_received;
-                syslog(LOG_DEBUG, "num_bytes_to_write: %ld", num_bytes_to_write);
+                DEBUG_LOG("main()...====> Main loop...num_bytes_to_write: %ld", num_bytes_to_write);
                 
 
-                // set flag to return (or not) the data to the client
+                // Set flag to return (or not) the data to the client
                 bSendDataBackToClient = false;
                 if (num_bytes_to_write < RECV_BUFFER_SIZE)
                 {
                     // packet is complete, send all data back to client
                     bSendDataBackToClient = true;
                 }
-                syslog(LOG_DEBUG, "bSendDataBackToClient: %d", bSendDataBackToClient);
+                DEBUG_LOG("main()...====> Main loop...bSendDataBackToClient: %d", bSendDataBackToClient);
 
-                // TODO: Append data to file
-                // TODO create File, open file, etc... and append to file
-                //  size_t fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream);
+
+                // Write buffer contents to file (in fact, append data at end of file)
                 //
-        
-
-                // Write into the file
-                //int num_char_written = fprintf(pFile, "%s", recv_buffer);
-                //if (num_char_written > 0)
-                //{
-                //    syslog(LOG_DEBUG, "Writing %s to %s", recv_buffer, OUTPUT_FILE);
-                //}
-                // Write buffer contents to file
+                //      size_t fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream);
+                //
+                DEBUG_LOG("main()...====> Main loop...Write buffer contents to file...");
                 size_t num_bytes_written  = fwrite(recv_buffer, 1, num_bytes_to_write, pFile);
-                syslog(LOG_DEBUG, "num_bytes_written: %ld", num_bytes_written);
+                DEBUG_LOG("main()...====> Main loop...num_bytes_written: %ld", num_bytes_written);
 
                 if (num_bytes_to_write != num_bytes_written)
                 {
@@ -359,44 +359,30 @@ int main(int argc, char *argv[])
                 }
                 else
                 {
-                    syslog(LOG_DEBUG, "All good all buffer written to file...");
+                    DEBUG_LOG("main()...====> Main loop...All good all buffer written to file...");
                 }
 
-
-
-                // TODO: Send the full content of the file back to the client   (COMMENTED OUT TEMPORARY)
-                //      ssize_t read(int fd, void *buf, size_t count);                      // read up to 'count' byte and return the number of byte read
-                //      ssize_t send(int sockfd, const void *buf, size_t len, int flags);   //
                 
+                // Send the full content of the file back to the client (only if packet is completed)
+                //
+                //      ssize_t read(int fd, void *buf, size_t count);
+                //              // read up to 'count' byte and return the number of byte read
+                //      ssize_t send(int sockfd, const void *buf, size_t len, int flags);
+                //              // send data to socket, the message is found in buf and has length len.
+                //
                 if (bSendDataBackToClient)
                 {
-                    //printf("Prepare to send the full content of the file back to the client...\n");
                     //
-                    //      size_t fread(void *ptr, size_t size, size_t nmembFILE *" stream );
+                    //      int fseek(FILE *stream, long offset, int whence);
+                    //      long ftell(FILE *stream);
+                    //      size_t fread(void *restrict ptr, size_t size, size_t nmemb, FILE *restrict stream);
                     //
-                    syslog(LOG_DEBUG, "Send the full content of the file back to the client...");
-
-                    
-                    // // int num_bytes_sent = 0;
-                    // // //num_bytes_sent = send(new_socket, buffer, valread, 0);
-                    // printf("Buffer contains     : %s\n", buffer);
-                    // num_bytes_sent = send(new_socket, buffer, strlen(buffer), 0);
-                    // printf("Num byte sent is: %ld\n", num_bytes_sent);
-
-                    // if (num_bytes_sent == -1)
-                    // {
-                    //     printf("Main loop...Debug only...on send: Error %d (%s)\n", errno, strerror(errno));
-                    // }
-                        
-
-                    // // // Send a message to the client using the client socket                
-                    // //char *message = "Hello, client!!!";
-                    // //send(new_socket, message, strlen(message), 0);
+                    DEBUG_LOG("main()...====> Main loop...Send the full content of the file back to the client...");
 
                     // Determine file size
                     fseek(pFile, 0, SEEK_END);
                     long file_size = ftell(pFile);
-                    syslog(LOG_DEBUG, "file_size: %ld", file_size);
+                    DEBUG_LOG("main()...====> Main loop...file_size: %ld", file_size);
                     fseek(pFile, 0, SEEK_SET);
 
                     // Allocate buffer for file contents
@@ -406,79 +392,78 @@ int main(int argc, char *argv[])
                     {
                         syslog(LOG_ERR, "Failed on malloc(), errno %d (%s)", errno, strerror(errno));
                         // Handle error allocating buffer
-                        //fclose(pFile);
+                        //fclose(pFile);                    // TODO: TO be remove!!!
                     }
                     else
                     {
                         // Read file contents into buffer
-                        syslog(LOG_DEBUG, "Copy file content into a buffer...");
-                        fread(my_tmp_buffer, 1, file_size, pFile);
+                        DEBUG_LOG("main()...====> Main loop...Read file content into a buffer...");
+                        size_t num_bytes_read = fread(my_tmp_buffer, 1, file_size, pFile);
+                        DEBUG_LOG("main()...====> Main loop...num_bytes_read: %ld", num_bytes_read);
                         my_tmp_buffer[file_size] = '\0'; // Null-terminate buffer
-                        //printf("%s", my_tmp_buffer);
-                        syslog(LOG_DEBUG, "Tmp buffer contains: %s", my_tmp_buffer);
+                        
+                        if (num_bytes_read < 256)   // Arbitrary value, just do not output large file
+                        {
+                            DEBUG_LOG("main()...====> Main loop...Tmp buffer contains: %s", my_tmp_buffer);
+                        }
+                        
 
-                        syslog(LOG_DEBUG, "Send buffer content back to the client...");
+                        DEBUG_LOG("main()...====> Main loop...Send buffer content back to the client...");
                         num_bytes_sent = send(new_socket, my_tmp_buffer, strlen(my_tmp_buffer), 0);
-                        // printf("Num byte sent is: %ld\n", num_bytes_sent);
-                        syslog(LOG_DEBUG, "Num byte sent is: %ld", num_bytes_sent);
+                        DEBUG_LOG("main()...====> Main loop...num_bytes_sent: %ld", num_bytes_sent);
 
 
                         // Free buffer and close file
                         free(my_tmp_buffer);
-                        //fclose(file);
+                        //fclose(file);                         // TODO: TO be remove!!!
                     }
-
                 }
                 else
                 {
-                    syslog(LOG_DEBUG, "Packet not completed yet, do not send it back to client now...");
-                }
-                
+                    DEBUG_LOG("main()...====> Main loop...Packet not completed yet, do not send it back to client now...");
+                }                
             }
             else
             {
-                // if valread == 0      // End of connection
-                // if valread == -1     // Handle error
-                //printf("Main loop...Debug only...new_socket= %d\n", new_socket);
-
-                if (num_bytes_received == 0)
+                //
+                // Handle close connection or error got on recv()
+                //
+                if (num_bytes_received == 0)        // End of connection
                 {
-                    // End of connection
-                    syslog(LOG_DEBUG, "------------------------------- Closed connection from %s:%d", client_ip, client_port);
+                    syslog(LOG_DEBUG, "Closed connection from %s:%d", client_ip, client_port);
 
                     if (close(new_socket) != 0)
                         syslog(LOG_ERR, "Failed closing client socket, errno %d (%s)", errno, strerror(errno));
-                    else
-                        new_socket = -1;        // Re-init client_socket file descriptor
-                        
-                    //break;                            // TODO cparadis : do we really need it??? Yes we need to handle 'close connection
+
+                    new_socket = -1;                // Re-init client_socket file descriptor
                 }
-                else if (num_bytes_received == -1)
+                else if (num_bytes_received == -1)   // Handle error
                 {
-                    syslog(LOG_ERR, "Need to handle error here..., errno %d (%s)", errno, strerror(errno));
+                    syslog(LOG_ERR, "Failed on recv(), need to handle error == %ld, errno %d (%s)", num_bytes_received, errno, strerror(errno));
+                }
+                else
+                {
+                    syslog(LOG_ERR, "Failed on recv(), need to handle error == %ld, errno %d (%s)", num_bytes_received, errno, strerror(errno));
                 }
             }
         }
         
         loop_number += 1;               // Update loop_number
-        //sleep(1);                     // Sleep 1 sec... to be remove!!!
-        //iUsleepRc = usleep(500000);     // Sleep 500ms... to be remove!!!
         //iUsleepRc = usleep(100000);     // Sleep 100ms... to be remove!!!
         iUsleepRc = usleep(10000);     // Sleep 10ms... to be remove!!!
         if (iUsleepRc != 0)
         {
-            //printf("Main loop...Debug only...on usleep %d (%s)\n", errno, strerror(errno));
             syslog(LOG_ERR, "Failed on usleep(), errno %d (%s)", errno, strerror(errno));
-            //break;      // Exit while loop
         }
     }   // End while (running)
 
 
-    // TODO: Cleanup before leaving
-    //  close connection...
-    //  closing any open sockets
-    //  close file and deleting the file /var/tmp/aesdsocketdata.
-    syslog(LOG_DEBUG, "Cleanup before exit...");
+    // Cleanup before exiting!!
+    //      closing client socket connection (client connection)
+    //      closing server socket
+    //      closing output file
+    //      deleting output file
+    DEBUG_LOG("main()...Cleanup before exit...");
     if (new_socket != -1)
     {
         if (close(new_socket) != 0)
@@ -488,8 +473,11 @@ int main(int argc, char *argv[])
     if (close(socket_fd) != 0)
         syslog(LOG_ERR, "Failed closing server socket, errno %d (%s)", errno, strerror(errno));
     
-    fclose(pFile);
-    delete_output_file();
+    if (fclose(pFile) != 0)
+        syslog(LOG_ERR, "Failed closing file, errno %d (%s)", errno, strerror(errno));
+
+    if (remove(OUTPUT_FILE) != 0)
+        syslog(LOG_ERR, "Failed to delete file %s, errno %d (%s)", OUTPUT_FILE, errno, strerror(errno));
 
     print_signal_infos();
 
