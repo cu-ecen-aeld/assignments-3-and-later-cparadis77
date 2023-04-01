@@ -8,8 +8,8 @@
 #			make clean			
 #
 
-#CC=gcc							#compiler
-CC=g++							#compiler
+CC=gcc							#compiler
+#CC=g++							#compiler
 
 #CFLAGS=-g -Wall				#compiler options
 CFLAGS=-g -Wall -Werror			#compiler options

@@ -45,6 +45,7 @@
 #include <errno.h>
 #include <fcntl.h>              // To use fcntl() for socket option
 #include <assert.h>
+#include <stdbool.h>            // To avoid compilation error: unknown type name 'bool'
 
 // -- Global Constants ----------------------------------------------------------------------------
 #define PORT 9000
