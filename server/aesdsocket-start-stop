@@ -5,27 +5,27 @@
 
 # Exit immediately if a pipeline, which may consist of a single simple command, a list, or a
 # compound command returns a non-zero status.
-set -e
+#set -e
 
 DAEMON_OPTS="-d"
 
 case "$1" in
   start)
-	echo "Starting aesdsocket server daemon..."
-	start-stop-daemon -S -n aesdsocket -a /usr/bin/aesdsocket -- $DAEMON_OPTS
-	echo $?
+	  echo "Starting aesdsocket server daemon..."
+	  start-stop-daemon -S -n aesdsocket -a /usr/bin/aesdsocket -- $DAEMON_OPTS
+	  [ $? == 0 ] && echo "OK" || echo "FAIL"
     ;;
   stop)
-	echo "Stopping aesdsocket server daemon..."
-	start-stop-daemon -K -n aesdsocket
-	echo $?
+	  echo "Stopping aesdsocket server daemon..."
+	  start-stop-daemon -K -n aesdsocket
+	  [ $? == 0 ] && echo "OK" || echo "FAIL"
     ;;
-  force-reload|restart)
+  restart)
     $0 stop
     $0 start
     ;;
   *)
-    echo "Usage: /etc/init.d/S99aesdsocket {start|stop|restart|force-reload}"
+    echo "Usage: /etc/init.d/S99aesdsocket {start|stop|restart}"
     exit 1
     ;;
 esac
